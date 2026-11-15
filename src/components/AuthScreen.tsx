@@ -21,7 +21,7 @@ const firebaseConfig = {
 };
 
 const GOOGLE_WEB_CLIENT_ID =
-  "1022366635526-plgfr3u3t5atq1enm7q8nopkbe2qro9n.apps.googleusercontent.com";
+  "624490697015-8p71i41iotko6rjtoc0t0g1qe9bhr96i.apps.googleusercontent.com";
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
