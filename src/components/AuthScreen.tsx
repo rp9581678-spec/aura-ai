@@ -308,10 +308,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthenticated }) => {
               Continue as Guest
             </button>
 
-            <p className="pt-1 text-center text-[11px] text-[#64748B]">
-              Admin access: <span className="font-mono text-[#94A3B8]">boss@aura.ai</span> or PIN{' '}
-              <span className="font-mono text-[#94A3B8]">2026</span>
-            </p>
+         
           </form>
         ) : (
           <form onSubmit={handleVerifyOtp} noValidate className="space-y-4">
