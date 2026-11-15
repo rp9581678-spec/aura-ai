@@ -590,28 +590,7 @@ export default function App() {
   };
   
 
-  const handleLogout = () => {
-    stopSpeech();
-    setAuthUser(null);
-    saveAuthUser(null);
-    setSettingsOpen(false);
-
-    const updated = recordTelemetryEvent((prev) => ({
-      ...prev,
-      activeSessionsCount: 0,
-      activityLogs: [
-        {
-          id: `log-${Date.now()}`,
-          timestamp: Date.now(),
-          text: `User logged out`,
-        },
-        ...prev.activityLogs,
-      ],
-    }));
-    setTelemetry(updated);
-
-    setScreen('auth');
-  };
+  
 
   const handleNewChat = () => {
     stopSpeech();
