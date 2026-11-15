@@ -116,28 +116,62 @@ function safeWrite(key: string, value: unknown): void {
   }
 }
 
+function getUserScope(): string {
+  const user = safeRead<AuthUser | null>(KEYS.AUTH_USER, null);
+  if (!user || !user.identifier) return 'guest';
+  if (user.role === 'guest' || user.identifier.toLowerCase() === 'guest@aura.ai') {
+    return 'guest';
+  }
+  return user.identifier.toLowerCase().replace(/[^a-z0-9@._-]/g, '_');
+}
+
+function clearLegacySharedData(): void {
+  try {
+    window.localStorage.removeItem(KEYS.SESSIONS);
+    window.localStorage.removeItem(KEYS.ACTIVE_SESSION_ID);
+    window.localStorage.removeItem('aura_saved_chats_v2');
+  } catch {
+    // Ignore
+  }
+}
+
 export function loadSettings(): UserSettings {
-  return { ...DEFAULT_SETTINGS, ...safeRead<Partial<UserSettings>>(KEYS.SETTINGS, {}) };
+  const scope = getUserScope();
+  if (scope === 'guest') return { ...DEFAULT_SETTINGS };
+  return {
+    ...DEFAULT_SETTINGS,
+    ...safeRead<Partial<UserSettings>>(`${KEYS.SETTINGS}_${scope}`, {}),
+  };
 }
 
 export function saveSettings(settings: UserSettings): void {
-  safeWrite(KEYS.SETTINGS, settings);
+  const scope = getUserScope();
+  if (scope === 'guest') return;
+  safeWrite(`${KEYS.SETTINGS}_${scope}`, settings);
 }
 
 export function loadSessions(): ChatSession[] {
-  return safeRead<ChatSession[]>(KEYS.SESSIONS, []);
+  const scope = getUserScope();
+  if (scope === 'guest') return [];
+  return safeRead<ChatSession[]>(`${KEYS.SESSIONS}_${scope}`, []);
 }
 
 export function saveSessions(sessions: ChatSession[]): void {
-  safeWrite(KEYS.SESSIONS, sessions);
+  const scope = getUserScope();
+  if (scope === 'guest') return;
+  safeWrite(`${KEYS.SESSIONS}_${scope}`, sessions);
 }
 
 export function loadActiveSessionId(): string | null {
-  return safeRead<string | null>(KEYS.ACTIVE_SESSION_ID, null);
+  const scope = getUserScope();
+  if (scope === 'guest') return null;
+  return safeRead<string | null>(`${KEYS.ACTIVE_SESSION_ID}_${scope}`, null);
 }
 
 export function saveActiveSessionId(id: string | null): void {
-  safeWrite(KEYS.ACTIVE_SESSION_ID, id);
+  const scope = getUserScope();
+  if (scope === 'guest') return;
+  safeWrite(`${KEYS.ACTIVE_SESSION_ID}_${scope}`, id);
 }
 
 export function loadAuthUser(): AuthUser | null {
@@ -145,6 +179,7 @@ export function loadAuthUser(): AuthUser | null {
 }
 
 export function saveAuthUser(user: AuthUser | null): void {
+  clearLegacySharedData();
   if (!user) {
     try {
       window.localStorage.removeItem(KEYS.AUTH_USER);
@@ -191,7 +226,11 @@ export function recordTelemetryEvent(
 }
 
 export function loadDailyGoal(): DailyGoal {
-  const stored = safeRead<Partial<DailyGoal>>(KEYS.DAILY_GOAL, {});
+  const scope = getUserScope();
+  const stored =
+    scope === 'guest'
+      ? {}
+      : safeRead<Partial<DailyGoal>>(`${KEYS.DAILY_GOAL}_${scope}`, {});
   const title =
     typeof stored.title === 'string' && stored.title.trim()
       ? stored.title.trim()
@@ -213,6 +252,7 @@ export function loadDailyGoal(): DailyGoal {
 }
 
 export function saveDailyGoal(goal: DailyGoal): void {
-  safeWrite(KEYS.DAILY_GOAL, goal);
-}
-
+  const scope = getUserScope();
+  if (scope === 'guest') return;
+  safeWrite(`${KEYS.DAILY_GOAL}_${scope}`, goal);
+      }
