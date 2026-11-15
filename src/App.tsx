@@ -154,7 +154,22 @@ export default function App() {
     return 'splash';
   });
 
+   const isGuestUser =
+    !authUser ||
+    authUser.role === 'guest' ||
+    authUser.identifier.toLowerCase() === 'guest@aura.ai';
+
   useEffect(() => {
+    if (isGuestUser) {
+      setSessions([]);
+      setActiveSessionId(null);
+      setSettings(loadSettings());
+      return;
+    }
+    setSessions(loadSessions());
+    setActiveSessionId(loadActiveSessionId());
+    setSettings(loadSettings());
+
     const initCloudSync = async () => {
       const cloudData = await fetchUserDataFromCloud(authUser);
       if (cloudData) {
@@ -167,23 +182,10 @@ export default function App() {
       }
     };
     initCloudSync();
-  }, [authUser]);
+  }, [authUser, isGuestUser]);
 
   const [settings, setSettings] = useState<UserSettings>(() => loadSettings());
-  const SAVED_CHATS_KEY = 'aura_saved_chats_v2';
-  const [sessions, setSessions] = useState<ChatSession[]>(() => {
-    if (typeof window === 'undefined') return loadSessions();
-    try {
-      const stored = localStorage.getItem(SAVED_CHATS_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {
-      // ignore
-    }
-    return loadSessions();
-  });
+  const [sessions, setSessions] = useState<ChatSession[]>(() => loadSessions());
 
   const [langMode, setLangMode] = useState<string>(() => {
     if (typeof window === 'undefined') return 'auto';
@@ -195,13 +197,12 @@ export default function App() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isGuestUser) {
+      setSaveBadgeText('👤 Guest (Temp)');
+      setSaveBadgeColor('#94a3b8');
+      return;
+    }
     try {
-      const optimizedCache = sessions.slice(0, 3).map((s) => ({
-        ...s,
-        messages: s.messages.slice(-10),
-      }));
-      localStorage.setItem(SAVED_CHATS_KEY, JSON.stringify(optimizedCache));
-
       syncUserDataToCloud(sessions, settings.personalMemory, authUser);
 
       setSaveBadgeText('⏳ Saving...');
@@ -214,7 +215,8 @@ export default function App() {
     } catch {
       // ignore
     }
-  }, [sessions, settings.personalMemory, authUser]);
+  }, [sessions, settings.personalMemory, authUser, isGuestUser]);
+  
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -529,9 +531,17 @@ export default function App() {
     [speakingMessageId, speakText, stopSpeech]
   );
 
-  const handleAuthenticated = (user: AuthUser, openAdminImmediately: boolean) => {
-    setAuthUser(user);
+    const handleAuthenticated = (user: AuthUser, openAdminImmediately: boolean) => {
     saveAuthUser(user);
+    setAuthUser(user);
+
+    if (user.role === 'guest' || user.identifier.toLowerCase() === 'guest@aura.ai') {
+      setSessions([]);
+      setActiveSessionId(null);
+    } else {
+      setSessions(loadSessions());
+      setActiveSessionId(loadActiveSessionId());
+    }
 
     const updated = recordTelemetryEvent((prev) => {
       const isNewUser = !managedUsers.some((u) => u.identifier === user.identifier);
@@ -553,6 +563,32 @@ export default function App() {
 
     setScreen(openAdminImmediately ? 'admin' : 'app');
   };
+
+  const handleLogout = () => {
+    stopSpeech();
+    saveAuthUser(null);
+    setAuthUser(null);
+    setSessions([]);
+    setActiveSessionId(null);
+    setSettingsOpen(false);
+
+    const updated = recordTelemetryEvent((prev) => ({
+      ...prev,
+      activeSessionsCount: 0,
+      activityLogs: [
+        {
+          id: `log-${Date.now()}`,
+          timestamp: Date.now(),
+          text: `User logged out`,
+        },
+        ...prev.activityLogs,
+      ],
+    }));
+    setTelemetry(updated);
+
+    setScreen('auth');
+  };
+  
 
   const handleLogout = () => {
     stopSpeech();
