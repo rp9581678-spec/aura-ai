@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 
+(window as any).__AURA_MAIN_LOADED__ = true;
+
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
   constructor(props: { children: React.ReactNode }) {
     super(props);
@@ -14,9 +16,9 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { err
   render() {
     if (this.state.error) {
       return (
-        <div style={{ padding: 24, color: '#f87171', background: '#07090E', minHeight: '100vh', fontFamily: 'sans-serif', fontSize: 14 }}>
+        <div style={{ padding: 24, color: '#f87171', background: '#07090E', minHeight: '100vh' }}>
           <h3>APK Crash Error:</h3>
-          <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{this.state.error.message}</pre>
+          <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{String(this.state.error)}</pre>
         </div>
       );
     }
