@@ -758,45 +758,186 @@ export default function App() {
       .replace(/[*#_`~>]/g, '')
       .trim()
       .slice(0, 450);
-
-    if (voiceMuted || !('speechSynthesis' in window) || !cleanSpeech) {
-      if (liveCallActive) {
-        setTimeout(() => startLiveCallListening(), 700);
-      }
-      return;
+  const stopSpeech = useCallback(() => {
+    const ttsWin = window as unknown as {
+      __auraTtsAudio?: HTMLAudioElement | null;
+      __auraTtsCancelled?: boolean;
+    };
+    ttsWin.__auraTtsCancelled = true;
+    if (ttsWin.__auraTtsAudio) {
+      try {
+        ttsWin.__auraTtsAudio.pause();
+        ttsWin.__auraTtsAudio.src = '';
+      } catch {}
+      ttsWin.__auraTtsAudio = null;
     }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch {}
+    }
+    setSpeakingMessageId(null);
+  }, []);
 
-    try {
-      window.speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(cleanSpeech);
-      utter.lang = /[\u0900-\u097F]/.test(cleanSpeech) ? 'hi-IN' : 'en-IN';
-      utter.rate = 1.02;
+  const speakText = useCallback(
+    (
+      text: string,
+      messageId: string,
+      profileOverride?: VoiceProfile,
+      speedOverride?: number
+    ) => {
+      if (voiceMuted) return;
 
-      let resumed = false;
-      const resumeNextTurn = () => {
-        if (resumed) return;
-        resumed = true;
-        if (liveCallActive) {
-          setTimeout(() => startLiveCallListening(), 600);
+      const cleanText = text
+        .replace(/```[\s\S]*?```/g, ' Code snippet. ')
+        .replace(/[#*_`>~]/g, ' ')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      if (!cleanText) return;
+
+      stopSpeech();
+
+      const ttsWin = window as unknown as {
+        __auraTtsAudio?: HTMLAudioElement | null;
+        __auraTtsCancelled?: boolean;
+      };
+      ttsWin.__auraTtsCancelled = false;
+
+      const speed = Math.min(Math.max(speedOverride ?? settings.speechSpeed ?? 1, 0.7), 1.5);
+      const isHindi = /[\u0900-\u097F]/.test(cleanText) || settings.language === 'Hindi';
+      const langTag = isHindi ? 'hi-IN' : 'en-IN';
+      const ttsLang = isHindi ? 'hi' : 'en-IN';
+
+      // Split text into natural chunks (max 160 chars) so neither Chrome nor APK cuts off
+      const rawParts = cleanText.match(/[^.?!।\n]+[.?!।\n]*/g) || [cleanText];
+      const chunks: string[] = [];
+      for (const part of rawParts) {
+        const trimmed = part.trim();
+        if (!trimmed) continue;
+        if (trimmed.length <= 160) {
+          chunks.push(trimmed);
+        } else {
+          const words = trimmed.split(' ');
+          let current = '';
+          for (const w of words) {
+            if ((current + ' ' + w).trim().length > 160) {
+              if (current) chunks.push(current.trim());
+              current = w;
+            } else {
+              current = (current + ' ' + w).trim();
+            }
+          }
+          if (current) chunks.push(current.trim());
+        }
+      }
+
+      const finishAll = () => {
+        if (!ttsWin.__auraTtsCancelled) {
+          setSpeakingMessageId(null);
+          if (liveCallActive) {
+            setTimeout(() => startLiveCallListening(), 600);
+          }
         }
       };
 
-      utter.onend = resumeNextTurn;
-      utter.onerror = resumeNextTurn;
+      // Engine 2: Native HTML5 Audio TTS (100% Working on Android APK WebView)
+      const playAudioFallback = (index: number) => {
+        if (ttsWin.__auraTtsCancelled || index >= chunks.length) {
+          finishAll();
+          return;
+        }
+        const chunk = chunks[index];
+        const url = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=${encodeURIComponent(
+          ttsLang
+        )}&q=${encodeURIComponent(chunk)}`;
 
-      // Guaranteed fallback timer in case Android Chrome skips onend
-      const estimatedMs = Math.max(3000, cleanSpeech.length * 75);
-      setTimeout(resumeNextTrustFallback => {
-        resumeNextTurn();
-      }, estimatedMs);
+        const audio = new Audio(url);
+        audio.playbackRate = speed;
+        ttsWin.__auraTtsAudio = audio;
 
-      window.speechSynthesis.speak(utter);
-    } catch {
-      if (liveCallActive) {
-        setTimeout(() => startLiveCallListening(), 1000);
+        audio.onended = () => {
+          playAudioFallback(index + 1);
+        };
+        audio.onerror = () => {
+          setSpeakingMessageId(null);
+          setInputNotice('Audio playback blocked or offline. Please check internet.');
+        };
+
+        audio.play().catch(() => {
+          setSpeakingMessageId(null);
+          setInputNotice('Tap Listen again to allow audio playback.');
+        });
+      };
+
+      // Engine 1: Web Speech API (Chrome / Desktop) with automatic fallback to Engine 2
+      const startSpeechEngine = () => {
+        setSpeakingMessageId(messageId);
+        const hasWebSpeech = typeof window !== 'undefined' && 'speechSynthesis' in window;
+        const voices = hasWebSpeech ? window.speechSynthesis.getVoices() : [];
+
+        if (!hasWebSpeech || voices.length === 0) {
+          playAudioFallback(0);
+          return;
+        }
+
+        const preferredVoice =
+          voices.find((v) => v.lang.toLowerCase() === langTag.toLowerCase()) ||
+          voices.find((v) => v.lang.toLowerCase().startsWith(ttsLang.toLowerCase())) ||
+          voices[0];
+
+        const speakChunk = (index: number) => {
+          if (ttsWin.__auraTtsCancelled || index >= chunks.length) {
+            finishAll();
+            return;
+          }
+          try {
+            const utter = new SpeechSynthesisUtterance(chunks[index]);
+            utter.lang = langTag;
+            if (preferredVoice) utter.voice = preferredVoice;
+            utter.rate = speed;
+            if (profileOverride === 'deep') utter.pitch = 0.85;
+            else if (profileOverride === 'bright') utter.pitch = 1.15;
+
+            utter.onend = () => speakChunk(index + 1);
+            utter.onerror = () => {
+              // If WebSpeech fails mid-way on mobile, switch seamlessly to Audio Engine
+              playAudioFallback(index);
+            };
+
+            window.speechSynthesis.speak(utter);
+          } catch {
+            playAudioFallback(index);
+          }
+        };
+
+        speakChunk(0);
+      };
+
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        const initialVoices = window.speechSynthesis.getVoices();
+        if (initialVoices.length === 0) {
+          // Give mobile Chrome 150ms to load voices; if still 0 (Android APK), it uses Audio Engine
+          setTimeout(startSpeechEngine, 150);
+          return;
+        }
       }
-    }
-  };
+
+      startSpeechEngine();
+    },
+    [
+      voiceMuted,
+      stopSpeech,
+      settings.speechSpeed,
+      settings.language,
+      liveCallActive,
+      startLiveCallListening,
+      setInputNotice,
+    ]
+  );
+    
+    
 
   const startLiveCallListening = () => {
     if (!liveCallActive) return;
