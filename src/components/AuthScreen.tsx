@@ -45,7 +45,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthenticated }) => {
   const [loading, setLoading] = useState(false);
   const [googleReady, setGoogleReady] = useState(false);
   const googleBtnRef = useRef<HTMLDivElement | null>(null);
-  const isAndroidWebView = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent) && (/; wv\)/i.test(navigator.userAgent) || /gonative|median/i.test(navigator.userAgent));
+    const isAndroidWebView = typeof window !== 'undefined' && /Android/i.test(navigator.userAgent) && (Boolean((window as any).median || (window as any).gonative) || !('chrome' in window) || /; wv\)/i.test(navigator.userAgent));
   
   // Google से टोकन मिलते ही सीधे Firebase में लॉग-इन करना (बिना किसी Redirect या सफ़ेद स्क्रीन के)
   const handleGoogleCredential = async (response: any) => {
