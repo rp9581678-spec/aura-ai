@@ -22,7 +22,7 @@ export default defineConfig(() => {
               const safeCode = jsChunk.code.replace(/<\/script>/gi, '<\\/script>');
               htmlFile.source = String(htmlFile.source).replace(
                 /<script[^>]*src="[^"]*"[^>]*><\/script>/i,
-                `<script>${safeCode}</script>`
+                () => `<script>${safeCode}</script>`
               );
               delete bundle[jsKey];
             }
@@ -51,4 +51,3 @@ export default defineConfig(() => {
     },
   };
 });
-
