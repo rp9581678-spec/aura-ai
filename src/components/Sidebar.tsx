@@ -15,6 +15,8 @@ import {
   Edit3,
   RotateCcw,
 } from 'lucide-react';
+import { getApps } from 'firebase/app';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { PWAInstallButton } from './PWAInstallButton';
 import {
   calculateGoalProgress,
@@ -59,6 +61,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
   dailyGoal: propDailyGoal,
   onUpdateDailyGoal,
 }) => {
+    const [userInfo, setUserInfo] = React.useState<{ name: string; email: string; isGoogle: boolean } | null>(null);
+
+  React.useEffect(() => {
+    try {
+      if (getApps().length > 0) {
+        const unsubscribe = onAuthStateChanged(getAuth(), (u) => {
+          if (u) {
+            const isGoogle = u.providerData?.some((p) => p.providerId === 'google.com') ?? false;
+            setUserInfo({
+              name: u.displayName || u.email?.split('@')[0] || 'AURA User',
+              email: u.email || '',
+              isGoogle,
+            });
+          } else {
+            setUserInfo(null);
+          }
+        });
+        return () => unsubscribe();
+      }
+    } catch {}
+  }, []);
+  
   const [vaultModalOpen, setVaultModalOpen] = useState(false);
   const [vaultPass, setVaultPass] = useState('');
   const [vaultError, setVaultError] = useState('');
@@ -193,7 +217,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <X className="h-4 w-4" />
           </button>
         </div>
-
+        {/* User Account Badge */}
+        <div className="mb-3 rounded-xl border border-cyan-500/20 bg-slate-900/70 px-3 py-2">
+          {userInfo ? (
+            <div className="flex flex-col gap-0.5">
+              <div className="flex items-center justify-between">
+                <span className="truncate text-xs font-semibold text-white">
+                  {userInfo.name}
+                </span>
+                <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+                  {userInfo.isGoogle ? 'Google Account' : 'Verified Account'}
+                </span>
+              </div>
+              {userInfo.email && (
+                <span className="truncate text-[11px] text-cyan-300/80">
+                  {userInfo.email}
+                </span>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-slate-300">Guest User</span>
+              <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-300">
+                Guest Mode
+              </span>
+            </div>
+          )}
+        </div>
+        
         {/* Top Row: New Chat + Sleek Locked Vault Button ("🔐") */}
         <div className="flex items-center gap-2">
           <button
