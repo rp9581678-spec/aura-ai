@@ -9,7 +9,7 @@ export default defineConfig(() => {
       react(),
       tailwindcss(),
       {
-        name: 'inline-webview-bundle',
+        name: 'bulletproof-webview-bundle',
         enforce: 'post',
         generateBundle(_, bundle) {
           const htmlFile = bundle['index.html'];
@@ -19,11 +19,18 @@ export default defineConfig(() => {
           if (htmlFile && htmlFile.type === 'asset' && jsKey) {
             const jsChunk = bundle[jsKey];
             if (jsChunk.type === 'chunk') {
-              const safeCode = jsChunk.code.replace(/<\/script>/gi, '<\\/script>');
-              htmlFile.source = String(htmlFile.source).replace(
-                /<script[^>]*src="[^"]*"[^>]*><\/script>/i,
-                () => `<script>${safeCode}</script>`
+              const safeCode = jsChunk.code
+                .replace(/<\/script/gi, '<\\/script')
+                .replace(/<!--/g, '<\\!--');
+              let html = String(htmlFile.source);
+              html = html.replace(/<link[^>]*rel="modulepreload"[^>]*>/gi, '');
+              html = html.replace(/ crossorigin/g, '');
+              html = html.replace(/<script[^>]*src="[^"]*"[^>]*><\/script>/gi, '');
+              html = html.replace(
+                /<\/body>/i,
+                () => `<script>${safeCode}</script>\n</body>`
               );
+              htmlFile.source = html;
               delete bundle[jsKey];
             }
           }
@@ -51,3 +58,4 @@ export default defineConfig(() => {
     },
   };
 });
+
