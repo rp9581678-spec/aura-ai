@@ -9,12 +9,24 @@ export default defineConfig(() => {
       react(),
       tailwindcss(),
       {
-        name: 'classic-webview-bundle',
+        name: 'inline-webview-bundle',
         enforce: 'post',
-        transformIndexHtml(html) {
-          return html
-            .replace(/ crossorigin/g, '')
-            .replace(/type="module"/g, 'defer');
+        generateBundle(_, bundle) {
+          const htmlFile = bundle['index.html'];
+          const jsKey = Object.keys(bundle).find(
+            (k) => k.endsWith('.js') && bundle[k].type === 'chunk'
+          );
+          if (htmlFile && htmlFile.type === 'asset' && jsKey) {
+            const jsChunk = bundle[jsKey];
+            if (jsChunk.type === 'chunk') {
+              const safeCode = jsChunk.code.replace(/<\/script>/gi, '<\\/script>');
+              htmlFile.source = String(htmlFile.source).replace(
+                /<script[^>]*src="[^"]*"[^>]*><\/script>/i,
+                `<script>${safeCode}</script>`
+              );
+              delete bundle[jsKey];
+            }
+          }
         },
       },
     ],
