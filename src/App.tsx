@@ -932,7 +932,7 @@ export default function App() {
       settings.speechSpeed,
       settings.language,
       liveCallActive,
-      startLiveCallListening,
+      
       setInputNotice,
     ]
   );
