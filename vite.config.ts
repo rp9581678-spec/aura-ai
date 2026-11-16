@@ -9,15 +9,24 @@ export default defineConfig(() => {
       react(),
       tailwindcss(),
       {
-        name: 'webview-compat',
+        name: 'classic-webview-bundle',
+        enforce: 'post',
         transformIndexHtml(html) {
-          return html.replace(/ crossorigin/g, '');
+          return html
+            .replace(/ crossorigin/g, '')
+            .replace(/type="module"/g, 'defer');
         },
       },
     ],
     build: {
       target: 'es2015',
       cssTarget: 'chrome61',
+      rollupOptions: {
+        output: {
+          format: 'iife',
+          inlineDynamicImports: true,
+        },
+      },
     },
     resolve: {
       alias: {
