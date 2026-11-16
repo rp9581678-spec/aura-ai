@@ -303,6 +303,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthenticated }) => {
           </button>
         </div>
       </div>
-    </div>
+    
   );
 };
