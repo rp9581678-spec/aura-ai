@@ -45,7 +45,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthenticated }) => {
   const [loading, setLoading] = useState(false);
   const [googleReady, setGoogleReady] = useState(false);
   const googleBtnRef = useRef<HTMLDivElement | null>(null);
-
+  const isAndroidWebView = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent) && (/; wv\)/i.test(navigator.userAgent) || /gonative|median/i.test(navigator.userAgent));
+  
   // Google से टोकन मिलते ही सीधे Firebase में लॉग-इन करना (बिना किसी Redirect या सफ़ेद स्क्रीन के)
   const handleGoogleCredential = async (response: any) => {
     if (!response?.credential) {
@@ -201,17 +202,29 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthenticated }) => {
           </div>
         )}
 
-        {/* Direct Google Sign-In बटन */}
-        <div className="w-full flex flex-col items-center">
-          <div
-            ref={googleBtnRef}
-            className="w-full flex justify-center min-h-[44px] rounded-xl overflow-hidden"
-          />
-          {!googleReady && (
-            <div className="w-full text-center py-3 rounded-xl bg-white/10 text-xs text-slate-300">
-              Google बटन लोड हो रहा है...
+                  {isAndroidWebView ? (
+            <div className="w-full rounded-xl border border-cyan-500/25 bg-cyan-500/10 p-3.5 text-center">
+              <p className="text-xs font-semibold text-cyan-300">
+                Android APK सुरक्षा सूचना
+              </p>
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-300">
+                APK में Google पॉप-अप समर्थित नहीं है। बिना रुकावट अंदर जाने के लिए नीचे <span className="font-semibold text-white">ईमेल-पासवर्ड</span> या <span className="font-semibold text-white">Guest Mode</span> का उपयोग करें, या Google लॉग-इन के लिए Chrome में खोलें।
+              </p>
+            </div>
+          ) : (
+            <div className="w-full flex flex-col items-center">
+              <div
+                ref={googleBtnRef}
+                className="w-full flex justify-center min-h-[44px] rounded-xl overflow-hidden"
+              />
+              {!googleReady && (
+                <div className="w-full text-center py-3 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-400">
+                  Google बटन लोड हो रहा है...
+                </div>
+              )}
             </div>
           )}
+        
         </div>
 
         <div className="flex items-center my-5">
