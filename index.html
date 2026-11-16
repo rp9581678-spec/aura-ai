@@ -68,18 +68,56 @@
   </head>
   <body class="bg-[#07090E] text-[#F1F5F9] antialiased selection:bg-[#00F0FF]/25 selection:text-white">
     <div id="root"></div>
-    <!-- Register Offline-Ready Service Worker -->
+        <!-- Android WebView Safe Guard & Service Worker -->
     <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker
-            .register('/sw.js')
-            .catch((err) => {
-              console.warn('[AURA PWA] Service worker registration error:', err);
+      (function () {
+        // 1. Safe localStorage polyfill if disabled in Android APK WebView
+        try {
+          var testKey = '__aura_test__';
+          window.localStorage.setItem(testKey, '1');
+          window.localStorage.removeItem(testKey);
+        } catch (e) {
+          var memStorage = {};
+          var fallbackStorage = {
+            getItem: function (k) { return Object.prototype.hasOwnProperty.call(memStorage, k) ? memStorage[k] : null; },
+            setItem: function (k, v) { memStorage[k] = String(v); },
+            removeItem: function (k) { delete memStorage[k]; },
+            clear: function () { memStorage = {}; }
+          };
+          try {
+            Object.defineProperty(window, 'localStorage', { value: fallbackStorage });
+            Object.defineProperty(window, 'sessionStorage', { value: fallbackStorage });
+          } catch (_) {}
+        }
+
+        // 2. Safe crypto.randomUUID polyfill for older Android WebView
+        if (typeof window.crypto !== 'undefined' && typeof window.crypto.randomUUID !== 'function') {
+          window.crypto.randomUUID = function () {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+              var r = (Math.random() * 16) | 0;
+              var v = c === 'x' ? r : (r & 0x3) | 0x8;
+              return v.toString(16);
             });
+          };
+        }
+
+        // 3. Show clear diagnostic message instead of blank black screen on crash
+        window.addEventListener('error', function (ev) {
+          var root = document.getElementById('root');
+          if (root && !root.innerHTML.trim()) {
+            root.innerHTML = '<div style="padding:24px;color:#f87171;font-family:sans-serif;font-size:14px;">App Error: ' + (ev.message || 'Unknown error') + '</div>';
+          }
         });
-      }
+
+        // 4. Service Worker (skip inside restricted WebView protocols)
+        if ('serviceWorker' in navigator && window.location.protocol.indexOf('http') === 0) {
+          window.addEventListener('load', function () {
+            navigator.serviceWorker.register('/sw.js').catch(function () {});
+          });
+        }
+      })();
     </script>
+    
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
