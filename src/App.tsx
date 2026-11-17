@@ -1626,9 +1626,10 @@ export default function App() {
     (window as unknown as { updateStudyGraphFromChat?: (t: string) => void }).updateStudyGraphFromChat?.(`Quiz Started: ${topic}`);
   };
 
-  if (screen === 'splash') {
-    return <SplashScreen />;
-  }
+      if (screen === 'splash') {
+      return <AuthScreen onAuthenticated={handleAuthenticated} />;
+      }
+    
 
   if (screen === 'analytics') {
     return (
