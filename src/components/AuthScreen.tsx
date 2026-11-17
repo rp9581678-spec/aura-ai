@@ -225,7 +225,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthenticated }) => {
             </div>
           )}
         
-        </div>
+        
 
         <div className="flex items-center my-5">
           <div className="flex-1 border-t border-white/10" />
